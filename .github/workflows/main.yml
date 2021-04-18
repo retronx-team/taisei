@@ -4,6 +4,7 @@ on:
     branches:
       - master
       - v1.*
+      - switch-ci
     tags:
       - v1.*
     paths:
@@ -21,88 +22,29 @@ on:
       - "**.build"
 
 jobs:
-  linux-test-build:
+  switch-build:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64_devkitarm
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v2
+      - name: Checkout Code
+        uses: actions/checkout@v2
+        with:
+          submodules: true
 
-    - name: Checkout Submodules
-      run: git submodule update --init --recursive
+      - name: Install Build Tools (pip)
+        run: pip install meson ninja zstandard
 
-    - name: Install Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
+      - name: Install Build Tools (apt)
+        run: sudo apt update && sudo apt install python3-docutils
 
-    - name: Install Build Tools (pip)
-      run: pip install meson ninja zstandard
+      - name: Env - Step 1 (Crossfile)
+        run: |
+          mkdir -p ./build
+          ./switch/crossfile.sh > ./build/crossfile.txt
 
-    - name: Install Build Tools (apt)
-      run: sudo apt update && sudo apt install build-essential libsdl2-dev libogg-dev libopusfile-dev libpng-dev libzip-dev libx11-dev libwayland-dev python3-docutils libwebp-dev libfreetype6-dev libzstd-dev
+      - name: Configure - Step 2 (Meson)
+        run: meson setup build/ --cross-file="./build/crossfile.txt" -Db_lto=false -Dstrip=false -Ddeprecation_warnings=no-error -Dwerror=true -Db_pch=false
 
-    - name: Configure - Step 1 (Meson)
-      run: meson setup --prefix=$(pwd)/build-test --wrap-mode=nofallback build/ -Db_lto=false -Dstrip=false -Ddeprecation_warnings=no-error -Dwerror=true -Db_pch=false
-
-    - name: Build - Step 2 (Ninja)
-      run: meson compile -C build/
-
-    - name: Install - Step 3 (Meson)
-      run: meson install -C build/
-
-    - name: Run - Step 4 (Taisei)
-      run: $(pwd)/build-test/bin/taisei -R $(pwd)/misc/tests/test-replay.tsr
-      env:
-        TAISEI_NOPRELOAD: 0
-        TAISEI_PRELOAD_REQUIRED: 1
-
-    - name: Upload Log
-      uses: actions/upload-artifact@v2
-      if: failure()
-      with:
-        name: taisei_linux_fail_log
-        path: build/meson-logs/meson-log.txt
-
-  macos-test-build:
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
-    runs-on: macos-10.15
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v2
-
-    - name: Checkout Submodules
-      run: git submodule update --init --recursive
-
-    - name: Set Up Build Environment
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
-
-    - name: Install Build Tools (brew)
-      run: brew install gcc meson pkg-config docutils pygments freetype2 libzip opusfile libvorbis webp sdl2 ninja
-
-    - name: Install Build Tools (pip)
-      run: pip install zstandard
-
-    - name: Configure - Step 1 (Meson)
-      run: meson setup --prefix=$(pwd)/build-test --wrap-mode=nofallback build/ -Db_lto=false -Dstrip=false -Ddeprecation_warnings=no-error -Dwerror=true -Db_pch=false
-
-    - name: Build - Step 2 (Ninja)
-      run: meson compile -C build/
-
-    - name: Install - Step 3 (Meson)
-      run: meson install -C build/
-
-    - name: Run - Step 4 (Taisei)
-      run: $(pwd)/build-test/Taisei.app/Contents/MacOS/Taisei -R $(pwd)/misc/tests/test-replay.tsr
-      env:
-        TAISEI_NOPRELOAD: 0
-        TAISEI_PRELOAD_REQUIRED: 1
-
-    - name: Upload Log
-      uses: actions/upload-artifact@v2
-      if: failure()
-      with:
-        name: taisei_macos_fail_log
-        path: build/meson-logs/meson-log.txt
+      - name: Build - Step 3 (Ninja)
+        run: meson compile -C build/
