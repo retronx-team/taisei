@@ -65,3 +65,10 @@ RUN dkp-pacman -Syyu --noconfirm \
 		switch-pkg-config && \
     dkp-pacman -S --needed --noconfirm `dkp-pacman -Slq dkp-libs | grep '^switch-'` && \
     dkp-pacman -Scc --noconfirm
+
+# compile SDL3 until changes are merged and packages are provided
+RUN git clone https://github.com/p-sam/SDL.git -b switch-sdl-3.4 --depth=1 /tmp/switch-sdl3 && \
+	cmake -S /tmp/switch-sdl3 -B /tmp/switch-sdl3/build \
+		-G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/Switch.cmake \
+		-DSDL_TEST_LIBRARY=OFF && \
+	ninja -C /tmp/switch-sdl3/build install
