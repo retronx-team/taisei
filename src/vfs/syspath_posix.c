@@ -17,10 +17,25 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#ifdef __SWITCH__
+#define PROT_READ 0
+#define MAP_PRIVATE 0
+#define MAP_FAILED -1
+static void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t __offset) {
+	errno = ENOTSUP;
+	return NULL;
+}
+static int munmap(void *addr, size_t len) {
+	errno = ENOTSUP;
+	return -1;
+}
+#else
+#include <sys/mman.h>
+#endif
 
 VFS_NODE_TYPE(VFSSysPathNode, {
 	char *path;
