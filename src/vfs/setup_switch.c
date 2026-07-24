@@ -9,25 +9,30 @@
 
 #include "setup.h"
 
-#include "util/stringops.h"
+#include "memory/scratch.h"
+#include "util/strbuf.h"
 
 static void vfs_setup_onsync(CallChainResult ccr) {
 	const char *program_dir = nxGetProgramDir();
-	char *res_path = strfmt("%s/%s", program_dir, TAISEI_BUILDCONF_DATA_PATH);
-	char *storage_path = strfmt("%s/storage", program_dir);
-	char *cache_path = strfmt("%s/cache", program_dir);
+	StringBuffer res_path_buf = { acquire_scratch_arena() };
+	StringBuffer storage_path_buf = { acquire_scratch_arena() };
+	StringBuffer cache_path_buf = { acquire_scratch_arena() };
+
+	strbuf_printf(&res_path_buf, "%s/%s", program_dir, TAISEI_BUILDCONF_DATA_PATH);
+	strbuf_printf(&storage_path_buf, "%s/storage", program_dir);
+	strbuf_printf(&cache_path_buf, "%s/cache", program_dir);
 
 	VfsSetupFixedPaths paths = {
-		.res_path = res_path,
-		.storage_path = storage_path,
-		.cache_path = cache_path,
+		.res_path = strbuf_commit(&res_path_buf),
+		.storage_path = strbuf_commit(&storage_path_buf),
+		.cache_path = strbuf_commit(&cache_path_buf),
 	};
 
 	vfs_setup_fixedpaths(&paths);
 
-	free(res_path);
-	free(storage_path);
-	free(cache_path);
+	release_scratch_arena(res_path_buf.arena);
+	release_scratch_arena(storage_path_buf.arena);
+	release_scratch_arena(cache_path_buf.arena);
 
 	vfs_setup_onsync_done(ccr);
 }
